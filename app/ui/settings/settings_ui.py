@@ -53,6 +53,7 @@ class SettingsPageUI(QtWidgets.QWidget):
         super(SettingsPageUI, self).__init__(parent)
 
         self.credential_widgets = {}
+        self._custom_profile_names: list[str] = []
 
         self.inpainters = ['LaMa', 'AOT']
         self.detectors = ['RT-DETR-v2']
@@ -168,13 +169,45 @@ class SettingsPageUI(QtWidgets.QWidget):
         ocr_models = [item for item in catalog["ocr_models"] if isinstance(item, dict) and item.get("id")]
         self.llms_page.set_image_context_credits(int(catalog.get("image_context_credits", 1)))
         if translators:
+            current_id = self.translator_combo.currentData() or self.translator_combo.currentText()
             self._replace_combo_items(self.translator_combo, translators, include_custom=True)
             self.supported_translators = [self._catalog_label(item, is_ocr=False) for item in translators] + [self.tr("Custom")]
             set_combo_box_width(self.translator_combo, self.supported_translators)
+            # Re-append user-defined Custom profiles and restore the selection
+            self.set_custom_profile_names(self._custom_profile_names, preferred=current_id)
         if ocr_models:
             self._replace_combo_items(self.ocr_combo, ocr_models)
             self.ocr_engines = [self._catalog_label(item, is_ocr=True) for item in ocr_models]
             set_combo_box_width(self.ocr_combo, self.ocr_engines)
+
+    def set_custom_profile_names(self, names: list[str], preferred: str | None = None) -> None:
+        """Add 'Custom: <name>' entries to the translator combo for each profile."""
+        from .custom_profiles import CUSTOM_VALUE_PREFIX, custom_value_for
+
+        self._custom_profile_names = [str(name).strip() for name in (names or []) if str(name).strip()]
+        combo = self.translator_combo
+        current = preferred or combo.currentData() or combo.currentText()
+
+        combo.blockSignals(True)
+        for index in reversed(range(combo.count())):
+            data = combo.itemData(index)
+            if isinstance(data, str) and data.startswith(CUSTOM_VALUE_PREFIX):
+                combo.removeItem(index)
+        for name in self._custom_profile_names:
+            value = custom_value_for(name)
+            combo.addItem(value, value)
+        index = combo.findData(current)
+        if index < 0:
+            index = combo.findText(current)
+        if index < 0 and isinstance(current, str) and current.startswith("Custom"):
+            index = combo.findData("Custom")
+        if index < 0:
+            index = combo.currentIndex() if combo.currentIndex() >= 0 else 0
+        combo.setCurrentIndex(index)
+        combo.blockSignals(False)
+
+        self.supported_translators = [combo.itemText(i) for i in range(combo.count())]
+        set_combo_box_width(combo, self.supported_translators)
 
     def _catalog_label(self, item: dict, is_ocr: bool) -> str:
         label = item.get("label", item["id"])
@@ -246,6 +279,8 @@ class SettingsPageUI(QtWidgets.QWidget):
         self.crop_margin_spinbox = self.tools_page.crop_margin_spinbox
         self.crop_trigger_spinbox = self.tools_page.crop_trigger_spinbox
         self.use_gpu_checkbox = self.tools_page.use_gpu_checkbox
+        self.batch_pages_spinbox = self.tools_page.batch_pages_spinbox
+        self.batch_blocks_spinbox = self.tools_page.batch_blocks_spinbox
 
         # Credentials
         self.save_keys_checkbox = self.credentials_page.save_keys_checkbox

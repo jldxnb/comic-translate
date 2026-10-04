@@ -27,6 +27,45 @@ class ToolsPage(QtWidgets.QWidget):
         translator_widget, self.translator_combo = create_title_and_combo(self.tr("Translator"), self.translators, h4=True)
         set_combo_box_width(self.translator_combo, self.translators)
 
+        # Batch translation (merged LLM requests)
+        batch_label = MLabel(self.tr("Batch Translation")).h4()
+        batch_hint = MLabel(self.tr(
+            "1 page per request keeps the original behavior. Higher values merge several pages "
+            "into a single LLM request and divide API request usage (RPD/RPM) by that factor. "
+            "Merging is skipped automatically when image input is enabled."
+        )).secondary()
+        batch_hint.setWordWrap(True)
+
+        batch_pages_layout = QtWidgets.QHBoxLayout()
+        batch_pages_label = MLabel(self.tr("Pages per LLM Request:"))
+        self.batch_pages_spinbox = MSpinBox().small()
+        self.batch_pages_spinbox.setFixedWidth(70)
+        self.batch_pages_spinbox.setMinimum(1)
+        self.batch_pages_spinbox.setMaximum(20)
+        self.batch_pages_spinbox.setValue(6)
+        batch_pages_layout.addWidget(batch_pages_label)
+        batch_pages_layout.addWidget(self.batch_pages_spinbox)
+        batch_pages_layout.addStretch()
+
+        batch_blocks_layout = QtWidgets.QHBoxLayout()
+        batch_blocks_label = MLabel(self.tr("Max Text Blocks per Request:"))
+        self.batch_blocks_spinbox = MSpinBox().small()
+        self.batch_blocks_spinbox.setFixedWidth(70)
+        self.batch_blocks_spinbox.setMinimum(20)
+        self.batch_blocks_spinbox.setMaximum(400)
+        self.batch_blocks_spinbox.setValue(100)
+        batch_blocks_layout.addWidget(batch_blocks_label)
+        batch_blocks_layout.addWidget(self.batch_blocks_spinbox)
+        batch_blocks_layout.addStretch()
+
+        batch_widget = QtWidgets.QWidget()
+        batch_widget_layout = QtWidgets.QVBoxLayout(batch_widget)
+        batch_widget_layout.setContentsMargins(0, 0, 0, 0)
+        batch_widget_layout.addWidget(batch_hint)
+        batch_widget_layout.addLayout(batch_pages_layout)
+        batch_widget_layout.addLayout(batch_blocks_layout)
+
+
         ocr_widget, self.ocr_combo = create_title_and_combo(self.tr("Text Recognition"), self.ocr_engines, h4=True)
         set_combo_box_width(self.ocr_combo, self.ocr_engines)
 
@@ -107,6 +146,9 @@ class ToolsPage(QtWidgets.QWidget):
 
 
         layout.addWidget(translator_widget)
+        layout.addSpacing(10)
+        layout.addWidget(batch_label)
+        layout.addWidget(batch_widget)
         layout.addSpacing(10)
         layout.addWidget(detector_widget)
         layout.addSpacing(10)

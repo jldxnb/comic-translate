@@ -11,6 +11,7 @@ from PySide6.QtGui import QFont, QFontDatabase, QDesktopServices
 
 from app.shortcuts import get_default_shortcuts
 from .settings_ui import SettingsPageUI
+from . import custom_profiles
 from modules.utils.device import is_gpu_available
 from app.account.auth.auth_client import AuthClient, USER_INFO_GROUP, \
     EMAIL_KEY, TIER_KEY, CREDITS_KEY, MONTHLY_CREDITS_KEY
@@ -106,11 +107,18 @@ class SettingsPage(QtWidgets.QWidget):
         self.ui.buy_credits_button.clicked.connect(self.open_pricing_page)
         self.ui.sign_out_button.clicked.connect(self.sign_out)
         self.ui.check_update_button.clicked.connect(self.check_for_updates)
+        self.ui.credentials_page.profiles_changed.connect(self._on_custom_profiles_changed)
         self._sync_extra_context_limit(self.ui.translator_combo.currentText())
+
+    def _on_custom_profiles_changed(self) -> None:
+        names = [profile["name"] for profile in self.ui.credentials_page.get_custom_profiles()]
+        self.ui.set_custom_profile_names(names)
 
     def _sync_extra_context_limit(self, translator: str) -> None:
         normalized = self.ui.reverse_mappings.get(translator, translator)
-        self.ui.llms_page.set_extra_context_unlimited(normalized == "Custom")
+        self.ui.llms_page.set_extra_context_unlimited(
+            normalized == "Custom" or str(normalized).startswith("Custom:")
+        )
 
     def on_theme_changed(self, theme: str):
         self.theme_changed.emit(theme)
@@ -171,17 +179,16 @@ class SettingsPage(QtWidgets.QWidget):
     def get_credentials(self, service: str = ""):
         save_keys = self.ui.save_keys_checkbox.isChecked()
 
-        def _text_or_none(widget_key):
-            w = self.ui.credential_widgets.get(widget_key)
-            return w.text() if w is not None else None
-
         if service:
             normalized = self.ui.value_mappings.get(service, service)
             creds = {'save_key': save_keys}
-            if normalized == "Custom":
-                for field in ("api_key", "api_url", "model"):
-                    creds[field] = _text_or_none(f"Custom_{field}")
-
+            if normalized == "Custom" or str(normalized).startswith("Custom:"):
+                profiles = self.ui.credentials_page.get_custom_profiles()
+                profile = custom_profiles.resolve_profile(profiles, normalized)
+                if profile:
+                    creds['api_key'] = profile.get('api_key', '')
+                    creds['api_url'] = profile.get('api_url', '')
+                    creds['model'] = profile.get('model', '')
             return creds
 
         # no `service` passed → recurse over all known services
@@ -200,6 +207,12 @@ class SettingsPage(QtWidgets.QWidget):
             settings['crop_trigger_size'] = self.ui.crop_trigger_spinbox.value()
 
         return settings
+
+    def get_batch_merge_settings(self):
+        return {
+            'pages_per_request': max(1, int(self.ui.batch_pages_spinbox.value())),
+            'blocks_per_request': max(1, int(self.ui.batch_blocks_spinbox.value())),
+        }
     
     def get_user_info(self):
         """Returns the current user information."""
@@ -220,7 +233,8 @@ class SettingsPage(QtWidgets.QWidget):
                 'detector': self.get_tool_selection('detector'),
                 'inpainter': self.get_tool_selection('inpainter'),
                 'use_gpu': self.is_gpu_enabled(),
-                'hd_strategy': self.get_hd_strategy_settings()
+                'hd_strategy': self.get_hd_strategy_settings(),
+                'batch': self.get_batch_merge_settings()
             },
             'llm': self.get_llm_settings(),
             'export': self.get_export_settings(),
@@ -310,22 +324,18 @@ class SettingsPage(QtWidgets.QWidget):
         settings.remove('archive_save_as')
         settings.endGroup()
 
-        # Save credentials separately if save_keys is checked
-        credentials = self.get_credentials()
+        # Save credentials separately if save_keys is checked.
+        # NOTE: custom_profiles helpers resolve their own 'credentials' group,
+        # so they must be called with a top-level QSettings.
         save_keys = self.ui.save_keys_checkbox.isChecked()
-        settings.beginGroup('credentials')
-        settings.setValue('save_keys', save_keys)
+        custom_profiles_list = self.ui.credentials_page.get_custom_profiles(commit=True)
         if save_keys:
-            for service, cred in credentials.items():
-                translated_service = self.ui.value_mappings.get(service, service)
-                
-                if translated_service == "Custom":
-                    settings.setValue(f"{translated_service}_api_key", cred['api_key'])
-                    settings.setValue(f"{translated_service}_api_url", cred['api_url'])
-                    settings.setValue(f"{translated_service}_model", cred['model'])
+            custom_profiles.save_profiles(settings, custom_profiles_list)
+            settings.beginGroup('credentials')
+            settings.setValue('save_keys', True)
+            settings.endGroup()
         else:
-            settings.remove('credentials')  # Clear all credentials if save_keys is unchecked
-        settings.endGroup()
+            settings.remove('credentials')  # Clear all saved credentials
 
     def load_settings(self):
         self._loading_settings = True
@@ -342,6 +352,13 @@ class SettingsPage(QtWidgets.QWidget):
         self.ui.theme_combo.setCurrentText(translated_theme)
         self.theme_changed.emit(translated_theme)
 
+        # Load Custom translator profiles before the tools section so a saved
+        # 'Custom: <name>' translator selection can be restored.
+        loaded_profiles = custom_profiles.load_profiles(settings)
+        loaded_profiles = custom_profiles.migrate_legacy_profile(settings, loaded_profiles)
+        self.ui.credentials_page.set_custom_profiles(loaded_profiles)
+        self.ui.set_custom_profile_names([profile["name"] for profile in loaded_profiles])
+
         # Load tools settings
         settings.beginGroup('tools')
         translator = settings.value('translator', 'Gemini-3.1-Flash-Lite')
@@ -349,6 +366,8 @@ class SettingsPage(QtWidgets.QWidget):
         translator_index = self.ui.translator_combo.findData(translator)
         if translator_index < 0:
             translator_index = self.ui.translator_combo.findText(translated_translator)
+        if translator_index < 0 and str(translator).startswith("Custom"):
+            translator_index = self.ui.translator_combo.findData("Custom")
         if translator_index >= 0:
             self.ui.translator_combo.setCurrentIndex(translator_index)
         else:
@@ -398,6 +417,11 @@ class SettingsPage(QtWidgets.QWidget):
             self.ui.crop_margin_spinbox.setValue(settings.value('crop_margin', 512, type=int))
             self.ui.crop_trigger_spinbox.setValue(settings.value('crop_trigger_size', 512, type=int))
         settings.endGroup()  # hd_strategy
+
+        settings.beginGroup('batch')
+        self.ui.batch_pages_spinbox.setValue(settings.value('pages_per_request', 6, type=int))
+        self.ui.batch_blocks_spinbox.setValue(settings.value('blocks_per_request', 100, type=int))
+        settings.endGroup()  # batch
         settings.endGroup()  # tools
 
         # Load LLM settings
@@ -437,18 +461,10 @@ class SettingsPage(QtWidgets.QWidget):
         if shortcut_ctrl is not None:
             shortcut_ctrl.apply_shortcuts()
 
-        # Load credentials
+        # Load credentials (Custom profiles were loaded before the tools section)
         settings.beginGroup('credentials')
         save_keys = settings.value('save_keys', False, type=bool)
         self.ui.save_keys_checkbox.setChecked(save_keys)
-        if save_keys:
-            for service in self.ui.credential_services:
-                translated_service = self.ui.value_mappings.get(service, service)
-                
-                if translated_service == "Custom":
-                    self.ui.credential_widgets[f"{translated_service}_api_key"].setText(settings.value(f"{translated_service}_api_key", ''))
-                    self.ui.credential_widgets[f"{translated_service}_api_url"].setText(settings.value(f"{translated_service}_api_url", ''))
-                    self.ui.credential_widgets[f"{translated_service}_model"].setText(settings.value(f"{translated_service}_model", ''))
         settings.endGroup()
 
         # ADDED: Load user info and update account view 

@@ -39,13 +39,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def _env_int(name: str, default: int) -> int:
-    try:
-        return int(os.environ.get(name, default))
-    except (TypeError, ValueError):
-        return default
-
-
 class BatchProcessor:
     """Handles batch processing of comic translation."""
 
@@ -92,11 +85,30 @@ class BatchProcessor:
         worker = getattr(self.main_page, "current_worker", None)
         return bool(worker and worker.is_cancelled)
 
+    def _merge_setting(self, key: str, env_name: str, default: int) -> int:
+        """Merge-tuning value: GUI setting (Settings > Tools > Batch Translation)
+        first, environment variable as a fallback for headless/CLI runs."""
+        try:
+            value = int(self.main_page.settings_page.get_batch_merge_settings().get(key, default))
+            if value >= 1:
+                return value
+        except Exception:
+            pass
+        try:
+            env_value = os.environ.get(env_name)
+            if env_value is not None:
+                value = int(env_value)
+                if value >= 1:
+                    return value
+        except (TypeError, ValueError):
+            pass
+        return default
+
     def _chunk_pages(self) -> int:
-        return max(1, _env_int('COMIC_TRANSLATE_BATCH_PAGES', 6))
+        return self._merge_setting('pages_per_request', 'COMIC_TRANSLATE_BATCH_PAGES', 6)
 
     def _chunk_blocks(self) -> int:
-        return max(1, _env_int('COMIC_TRANSLATE_BATCH_BLOCKS', 100))
+        return self._merge_setting('blocks_per_request', 'COMIC_TRANSLATE_BATCH_BLOCKS', 100)
 
     def batch_process(self, selected_paths: List[str] = None):
         timestamp = datetime.now().strftime("%b-%d-%Y_%I-%M-%S%p")

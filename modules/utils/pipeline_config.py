@@ -61,9 +61,7 @@ def validate_ocr(main: ComicTranslate):
 def validate_translator(main: ComicTranslate, target_lang: str):
     """Ensure either API credentials are set or the user is authenticated, plus check compatibility."""
     settings_page = main.settings_page
-    tr = settings_page.ui.tr
     settings = settings_page.get_all_settings()
-    credentials = settings.get('credentials', {})
     translator_tool = settings['tools']['translator']
 
     if not translator_tool:
@@ -71,10 +69,10 @@ def validate_translator(main: ComicTranslate, target_lang: str):
         return False
 
     # Credential checks
-    if "Custom" in translator_tool:
-        # Custom requires api_key, api_url, and model to be configured LOCALLY
-        service = tr('Custom')
-        creds = credentials.get(service, {})
+    if str(translator_tool).startswith("Custom"):
+        # Custom (or 'Custom: <profile>') requires api_key, api_url, and model
+        # to be configured LOCALLY
+        creds = settings_page.get_credentials(translator_tool) or {}
         # Check if all required fields are present and non-empty
         if not all([creds.get('api_key'), creds.get('api_url'), creds.get('model')]):
             Messages.show_custom_not_configured_error(main)
