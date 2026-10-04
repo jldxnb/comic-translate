@@ -279,7 +279,12 @@ class TextBlockItem(QGraphicsTextItem):
 
         # Only merge if we have a selection OR if it's not a color change on HTML.
         # This prevents clobbering inline span colors during project loading/global changes.
-        is_global_html_color = not has_selection and attribute == 'color' and self.is_html(self.toHtml())
+        # Vertical rendering only honours explicit per-character colours
+        # (it ignores the default text colour), so keep merging the colour
+        # for vertical items; otherwise the guard protects inline span
+        # colours from being clobbered on project load / global changes.
+        is_global_html_color = (not has_selection and attribute == 'color'
+                                and self.is_html(self.toHtml()) and not self.vertical)
         
         if not is_global_html_color:
             if not has_selection:
