@@ -1,0 +1,69 @@
+name: Sync with upstream
+
+on:
+  schedule:
+    # 每天 04:23 UTC（北京时间 12:23）检查一次上游更新
+    - cron: "23 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch upstream
+        run: |
+          git remote add upstream https://github.com/ogkalu2/comic-translate.git
+          git fetch upstream main
+
+      - name: Rebase local commits onto upstream/main
+        id: rebase
+        run: |
+          if git rebase upstream/main; then
+            echo "rebased=true" >> "$GITHUB_OUTPUT"
+          else
+            git rebase --abort
+            echo "::error::Rebase conflict: local patch conflicts with upstream changes, resolve manually"
+            exit 1
+          fi
+
+      # 上游若改动了 .github/workflows，GITHUB_TOKEN 不允许推送 workflow 文件变更，
+      # 因此把 workflow 目录恢复成本地原状（上游 workflow 一律通过 API 禁用，不需要其内容）
+      - name: Neutralize upstream workflow-file changes
+        run: |
+          if ! git diff --quiet origin/main HEAD -- .github/workflows; then
+            git checkout origin/main -- .github/workflows
+            git commit -m "chore: keep local workflow files unchanged from upstream"
+          fi
+
+      - name: Push
+        run: git push --force-with-lease origin main
+
+      # 幂等：每次同步后把除本 workflow 以外的所有 workflow 全部禁用
+      - name: Disable upstream workflows
+        if: always()
+        run: |
+          for id in $(curl -s -H "Authorization: Bearer ${{ github.token }}" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows?per_page=100" \
+            | jq -r '.workflows[] | select(.path != ".github/workflows/sync-upstream.yml") | .id'); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" -X PUT \
+              -H "Authorization: Bearer ${{ github.token }}" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/$id/disable")
+            echo "workflow $id disable -> HTTP $code"
+          done
