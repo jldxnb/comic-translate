@@ -69,14 +69,17 @@ class GPTTranslation(BaseLLMTranslation):
                 }
             ]
         else:
+            # Plain-string content: the array-of-parts form is not understood by
+            # every OpenAI-compatible provider (e.g. Zhipu GLM degrades to
+            # garbage or empty responses), while string content works everywhere.
             messages = [
                 {
-                    "role": "system", 
-                    "content": [{"type": "text", "text": system_prompt}]
+                    "role": "system",
+                    "content": system_prompt
                 },
                 {
-                    "role": "user", 
-                    "content": [{"type": "text", "text": user_prompt}]
+                    "role": "user",
+                    "content": user_prompt
                 }
             ]
 
