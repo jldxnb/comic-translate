@@ -90,6 +90,17 @@ def extract_foreground_color(image: np.ndarray) -> list[int] | None:
     fg = np.round(fg).astype(int).tolist()
     snapped = snap_extreme_neutrals(fg)
 
+    # Coloured character fill with a thick neutral outline (very common for SFX
+    # in comics): the mask is dominated by the outline, so the estimate snaps
+    # to black/white while the true fill is a saturated colour.  Prefer the
+    # chromatic cluster when it is a substantial part of the text pixels.
+    if snapped in ([0, 0, 0], [255, 255, 255]):
+        chroma = text_pixels.max(axis=1) - text_pixels.min(axis=1)
+        colored = text_pixels[chroma >= 45]
+        if len(colored) >= max(5, int(0.12 * text_pixels.shape[0])):
+            fill = np.round(np.median(colored, axis=0)).astype(int).tolist()
+            snapped = snap_extreme_neutrals(fill)
+
     # Targeted correction for colored text inside bright bubbles surrounded by
     # very dark borders/background. In this case bg_luma can be dark while the
     # selected mask is mostly bright fill, and the 80th percentile drifts to the

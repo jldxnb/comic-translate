@@ -214,6 +214,12 @@ class SettingsPage(QtWidgets.QWidget):
             'pages_per_request': max(1, int(self.ui.batch_pages_spinbox.value())),
             'blocks_per_request': max(1, int(self.ui.batch_blocks_spinbox.value())),
         }
+
+    def get_detector_confidence(self) -> float:
+        try:
+            return float(self.ui.detector_threshold_spinbox.value())
+        except Exception:
+            return 0.30
     
     def get_user_info(self):
         """Returns the current user information."""
@@ -232,6 +238,7 @@ class SettingsPage(QtWidgets.QWidget):
                 'translator': self.get_tool_selection('translator'),
                 'ocr': self.get_tool_selection('ocr'),
                 'detector': self.get_tool_selection('detector'),
+                'detector_confidence': self.get_detector_confidence(),
                 'inpainter': self.get_tool_selection('inpainter'),
                 'use_gpu': self.is_gpu_enabled(),
                 'hd_strategy': self.get_hd_strategy_settings(),
@@ -397,6 +404,13 @@ class SettingsPage(QtWidgets.QWidget):
             self.ui.detector_combo.setCurrentText(translated_detector)
         else:
             self.ui.detector_combo.setCurrentIndex(-1)
+
+        try:
+            self.ui.detector_threshold_spinbox.setValue(
+                float(settings.value('detector_confidence', 0.30))
+            )
+        except (TypeError, ValueError):
+            self.ui.detector_threshold_spinbox.setValue(0.30)
 
         if is_gpu_available():
             self.ui.use_gpu_checkbox.setChecked(settings.value('use_gpu', False, type=bool))

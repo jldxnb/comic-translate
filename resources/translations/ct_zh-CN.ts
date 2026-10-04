@@ -1675,6 +1675,14 @@ Open or create a project to get started.</source>
 <context>
     <name>ToolsPage</name>
     <message>
+        <source>Detection Threshold:</source>
+        <translation>检测阈值：</translation>
+    </message>
+    <message>
+        <source>Lower values detect more text (floating SFX, stylized lettering) at the cost of possible false detections. Try 0.10–0.15 for SFX-heavy comics.</source>
+        <translation>数值越低检测越激进（可抓到更多飘字、艺术字，但可能产生误检）。拟声词多的漫画可尝试 0.10–0.15。</translation>
+    </message>
+    <message>
         <source>Batch Translation</source>
         <translation>批量翻译</translation>
     </message>

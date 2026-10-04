@@ -281,6 +281,7 @@ class SettingsPageUI(QtWidgets.QWidget):
         self.use_gpu_checkbox = self.tools_page.use_gpu_checkbox
         self.batch_pages_spinbox = self.tools_page.batch_pages_spinbox
         self.batch_blocks_spinbox = self.tools_page.batch_blocks_spinbox
+        self.detector_threshold_spinbox = self.tools_page.detector_threshold_spinbox
 
         # Credentials
         self.save_keys_checkbox = self.credentials_page.save_keys_checkbox

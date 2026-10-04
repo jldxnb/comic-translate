@@ -30,9 +30,16 @@ class DetectionEngineFactory:
         """
         effective_backend = cls._resolve_backend(backend)
 
+        # Detection sensitivity (GUI: Settings > Tools > Detection Threshold).
+        # Engine instances are cached, so the threshold goes into the key.
+        try:
+            detector_confidence = float(settings.get_detector_confidence())
+        except Exception:
+            detector_confidence = 0.30
+
         # build cache key
         device = resolve_device(settings.is_gpu_enabled(), effective_backend)
-        cache_key = f"{model_name}_{effective_backend}_{device}"
+        cache_key = f"{model_name}_{effective_backend}_{device}_{detector_confidence:.2f}"
 
         # Return cached engine if available
         if cache_key in cls._engines:
@@ -60,14 +67,18 @@ class DetectionEngineFactory:
     def _create_rtdetr_v2(settings, backend: str = 'onnx'):
         """Create and initialize RT-DETR-v2 detection engine."""
         device = resolve_device(settings.is_gpu_enabled(), backend)
+        try:
+            detector_confidence = float(settings.get_detector_confidence())
+        except Exception:
+            detector_confidence = 0.30
         
         if backend.lower() == 'torch' and torch_available():
             from .rtdetr_v2 import RTDetrV2Detection
             engine = RTDetrV2Detection(settings)
-            engine.initialize(device=device)
+            engine.initialize(device=device, confidence_threshold=detector_confidence)
         else:
             engine = RTDetrV2ONNXDetection(settings)
-            engine.initialize(device=device)
+            engine.initialize(device=device, confidence_threshold=detector_confidence)
         
         return engine
     

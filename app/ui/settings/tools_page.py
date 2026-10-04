@@ -72,6 +72,31 @@ class ToolsPage(QtWidgets.QWidget):
         detector_widget, self.detector_combo = create_title_and_combo(self.tr("Text Detector"), self.detectors, h4=True)
         set_combo_box_width(self.detector_combo, self.detectors)
 
+        # Detection sensitivity: lower thresholds catch stylized / floating text
+        detector_threshold_layout = QtWidgets.QHBoxLayout()
+        detector_threshold_label = MLabel(self.tr("Detection Threshold:"))
+        self.detector_threshold_spinbox = QtWidgets.QDoubleSpinBox()
+        self.detector_threshold_spinbox.setFixedWidth(80)
+        self.detector_threshold_spinbox.setRange(0.05, 0.50)
+        self.detector_threshold_spinbox.setSingleStep(0.05)
+        self.detector_threshold_spinbox.setDecimals(2)
+        self.detector_threshold_spinbox.setValue(0.30)
+        detector_threshold_layout.addWidget(detector_threshold_label)
+        detector_threshold_layout.addWidget(self.detector_threshold_spinbox)
+        detector_threshold_layout.addStretch()
+
+        detector_hint = MLabel(self.tr(
+            "Lower values detect more text (floating SFX, stylized lettering) at the "
+            "cost of possible false detections. Try 0.10\u20130.15 for SFX-heavy comics."
+        )).secondary()
+        detector_hint.setWordWrap(True)
+
+        detector_threshold_widget = QtWidgets.QWidget()
+        detector_threshold_widget_layout = QtWidgets.QVBoxLayout(detector_threshold_widget)
+        detector_threshold_widget_layout.setContentsMargins(0, 0, 0, 0)
+        detector_threshold_widget_layout.addLayout(detector_threshold_layout)
+        detector_threshold_widget_layout.addWidget(detector_hint)
+
         inpainting_label = MLabel(self.tr("Image Cleaning")).h4()
         inpainter_widget, self.inpainter_combo = create_title_and_combo(self.tr("Inpainter"), self.inpainters, h4=False)
         set_combo_box_width(self.inpainter_combo, self.inpainters)
@@ -151,6 +176,7 @@ class ToolsPage(QtWidgets.QWidget):
         layout.addWidget(batch_widget)
         layout.addSpacing(10)
         layout.addWidget(detector_widget)
+        layout.addWidget(detector_threshold_widget)
         layout.addSpacing(10)
         layout.addWidget(ocr_widget)
         layout.addSpacing(10)
