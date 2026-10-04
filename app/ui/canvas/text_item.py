@@ -189,6 +189,11 @@ class TextBlockItem(QGraphicsTextItem):
             self.setHtml(text)
             self.setTextWidth(width)
             self.set_outline(self.outline_color, self.outline_width)
+            # Rich-text documents carry no colour of their own (manual edits
+            # store colourless HTML); without this the text falls back to the
+            # theme palette colour — white on the dark theme — when a page is
+            # restored or exported.
+            self.set_color(self.text_color)
         else:
             self.set_plain_text(text)
 
