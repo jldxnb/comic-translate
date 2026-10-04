@@ -1,9 +1,35 @@
 from __future__ import annotations
 
 import os
+import sys
 from typing import Any, Mapping, Optional
 import onnxruntime as ort
 from .paths import get_user_data_dir
+
+_TRT_PROBE: Optional[bool] = None
+
+
+def _tensorrt_available() -> bool:
+    """Best-effort one-time probe for TensorRT native libraries."""
+    global _TRT_PROBE
+    if _TRT_PROBE is None:
+        _TRT_PROBE = False
+        try:
+            import ctypes
+            names = ("nvinfer_10", "nvinfer")
+            for name in names:
+                try:
+                    if sys.platform == "win32":
+                        ctypes.WinDLL(name)
+                    else:
+                        ctypes.CDLL(f"lib{name}.so")
+                    _TRT_PROBE = True
+                    break
+                except OSError:
+                    continue
+        except Exception:
+            _TRT_PROBE = False
+    return _TRT_PROBE
 
 
 def torch_available() -> bool:
@@ -153,7 +179,13 @@ def get_providers(device: Optional[str] = None) -> list[Any]:
     if not available:
         return ['CPUExecutionProvider']
 
-    
+    # ONNX Runtime lists the TensorRT provider even when its native libraries
+    # are absent; every session then fails an expensive EP init and prints a
+    # scary error banner before falling back to CUDA. Probe the libraries once
+    # and drop the provider when they are missing.
+    if 'TensorrtExecutionProvider' in available and not _tensorrt_available():
+        available = [p for p in available if p != 'TensorrtExecutionProvider']
+
     # Use user data directory for cache
     base_models_dir = os.path.join(get_user_data_dir(), "models")
     
