@@ -21,6 +21,22 @@ logger = logging.getLogger(__name__)
 MAX_REQUESTS_PER_MINUTE = 13
 _RETRYABLE_STATUS_HINTS = ("429", "500", "502", "503", "resource_exhausted", "overloaded")
 
+# Account-level problems that retrying cannot fix; fail fast instead of
+# burning backoff time. Matched case-insensitively against the error text.
+_NON_RETRYABLE_HINTS = (
+    "insufficient balance", "insufficient_quota", "insufficient quota",
+    "insufficient credits", "exceeded your current quota", "billing",
+    "account is deactivated", "account has been suspended", "account suspended",
+    "欠费", "余额不足", "已被封禁",
+    # Zhipu/BigModel business codes: 1113 arrears, 1308/1309/1310 plan limits
+    '"code": "1113"', '"code": "1308"', '"code": "1309"', '"code": "1310"',
+    '"code":"1113"', '"code":"1308"', '"code":"1309"', '"code":"1310"',
+)
+
+# Provider slowness (e.g. an overloaded model queueing the request): one retry
+# is worth it, but each attempt costs a full request timeout, so no more.
+_TIMEOUT_HINTS = ("timed out", "timeout")
+
 _RPM_LOCK = threading.Lock()
 _REQUEST_TIMES: deque = deque()
 
@@ -94,15 +110,27 @@ class BaseLLMTranslation(LLMTranslation):
 
     def _perform_translation_with_retry(self, user_prompt: str, system_prompt: str, image: np.ndarray,
                                         max_retries: int = 3) -> str:
-        """Throttled _perform_translation with backoff on retryable API failures (429/5xx)."""
+        """Throttled _perform_translation with backoff on retryable API failures.
+
+        Retries rate-limit/overload/server errors; request timeouts get a single
+        retry; account-level problems (billing, quotas, bans) fail immediately.
+        """
         for attempt in range(max_retries + 1):
             _throttle()
             try:
                 return self._perform_translation(user_prompt, system_prompt, image)
             except Exception as e:
                 message = str(e).lower()
-                retryable = any(hint in message for hint in _RETRYABLE_STATUS_HINTS)
-                if not retryable or attempt >= max_retries:
+                if any(hint in message for hint in _NON_RETRYABLE_HINTS):
+                    logger.warning("LLM request failed with a non-retryable account error: %s",
+                                   str(e)[:200])
+                    raise
+                if any(hint in message for hint in _TIMEOUT_HINTS):
+                    retryable = attempt < 1
+                else:
+                    retryable = (attempt < max_retries
+                                 and any(hint in message for hint in _RETRYABLE_STATUS_HINTS))
+                if not retryable:
                     raise
                 wait = 20 * (2 ** attempt)
                 logger.warning("LLM request failed (attempt %d/%d), retrying in %ds: %s",
