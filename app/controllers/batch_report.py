@@ -85,6 +85,11 @@ class BatchReportController:
             "flagged as unsafe" in lowered
             or "content was flagged" in lowered
             or "safety filters" in lowered
+            # Zhipu/BigModel content-safety rejection (incl. escaped JSON bodies)
+            or "contentfilter" in lowered
+            or '"code": "1301"' in lowered
+            or '"code":"1301"' in lowered
+            or "不安全或敏感内容" in lowered
         )
 
     def _is_user_skip_reason(self, skip_reason: str, error: str = "") -> bool:
