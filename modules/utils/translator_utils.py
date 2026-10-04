@@ -43,7 +43,7 @@ def get_raw_translation(blk_list: list[TextBlock]):
     return raw_translations_json
 
 def set_texts_from_json(blk_list: list[TextBlock], json_string: str):
-    match = re.search(r"\{[\s\S]*\}", json_string)
+    match = re.search(r"\{[\s\S]*\}", json_string or "")
     if match:
         # Extract the JSON string from the matched regular expression
         json_string = match.group(0)
@@ -56,7 +56,8 @@ def set_texts_from_json(blk_list: list[TextBlock], json_string: str):
             else:
                 print(f"Warning: {block_key} not found in JSON string.")
     else:
-        print("No JSON found in the input string.")
+        preview = str(json_string)[:200] if json_string is not None else "None"
+        print(f"No JSON found in the input string. Response preview: {preview!r}")
 
 def set_upper_case(blk_list: list[TextBlock], upper_case: bool):
     for blk in blk_list:

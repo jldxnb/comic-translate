@@ -19,7 +19,7 @@ from modules.utils.textblock import sort_blk_list
 from modules.utils.pipeline_config import get_config
 from modules.utils.image_utils import generate_mask, get_smart_text_color
 from modules.utils.language_utils import get_language_code, is_no_space_lang
-from modules.utils.translator_utils import get_raw_translation, get_raw_text, format_translations, is_renderable_translation
+from modules.utils.translator_utils import get_raw_translation, get_raw_text, format_translations, is_renderable_translation, has_translatable_content
 from modules.rendering.render import get_best_render_area, pyside_word_wrap, is_vertical_block
 from modules.utils.device import resolve_device
 from modules.utils.exceptions import InsufficientCreditsException
@@ -353,6 +353,16 @@ class BatchProcessor:
         """Per-page translation with the original error/skip semantics."""
         try:
             ctx['translator'].translate(ctx['blk_list'], ctx['image'], ctx['extra_context'])
+            # A response without usable JSON "succeeds" without translating
+            # anything; treat that as a failure so the page is reported and
+            # retryable instead of silently finalizing empty.
+            translatable = [
+                blk for blk in ctx['blk_list']
+                if has_translatable_content(getattr(blk, "text", ""))
+            ]
+            if translatable and not any((blk.translation or "").strip() for blk in translatable):
+                raise RuntimeError(
+                    "The model returned no usable translation (no JSON in the response)")
             self.cache_manager._cache_translation_results(ctx['translation_cache_key'], ctx['blk_list'])
             ctx['translate_error'] = None
         except InsufficientCreditsException:

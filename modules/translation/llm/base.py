@@ -187,10 +187,12 @@ class BaseLLMTranslation(LLMTranslation):
         finally:
             self.max_tokens = old_max_tokens
 
-        match = re.search(r"\{[\s\S]*\}", response)
+        response_text = response if isinstance(response, str) else ""
+        match = re.search(r"\{[\s\S]*\}", response_text)
         if not match:
-            logger.warning("Batch translation: no JSON object in response, %d page(s) need fallback",
-                           len(blk_lists))
+            logger.warning("Batch translation: no JSON object in response, %d page(s) need fallback; "
+                           "response preview: %r",
+                           len(blk_lists), response_text[:200])
             return ok_pages, set(range(len(blk_lists)))
         try:
             data = json.loads(match.group(0))
@@ -202,6 +204,10 @@ class BaseLLMTranslation(LLMTranslation):
             if not keys:
                 continue
             missing = [key for key, _ in keys if key not in data]
+            if not missing and not any(str(data[key] or "").strip() for key, _ in keys):
+                # All keys answered with empty text: treat as a failed page so it
+                # is retried per page instead of silently rendering nothing.
+                missing = [key for key, _ in keys]
             if missing:
                 logger.warning("Batch translation: page %d missing %d/%d keys, needs per-page fallback",
                                pi, len(missing), len(keys))
