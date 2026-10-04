@@ -1,4 +1,8 @@
 from typing import Any
+import logging
+import threading
+import time
+from collections import deque
 import numpy as np
 from abc import abstractmethod
 import base64
@@ -7,6 +11,31 @@ import imkit as imk
 from ..base import LLMTranslation
 from ...utils.textblock import TextBlock
 from ...utils.translator_utils import get_raw_text, set_texts_from_json
+
+logger = logging.getLogger(__name__)
+
+# Sliding-window client-side rate limit shared by all LLM engines.
+# Free-tier Gemini allows 15 RPM; pace under it to avoid 429s during batches.
+MAX_REQUESTS_PER_MINUTE = 13
+_RETRYABLE_STATUS_HINTS = ("429", "500", "502", "503", "resource_exhausted", "overloaded")
+
+_RPM_LOCK = threading.Lock()
+_REQUEST_TIMES: deque = deque()
+
+
+def _throttle() -> None:
+    """Block until a request slot is available in the current 60s window."""
+    while True:
+        with _RPM_LOCK:
+            now = time.monotonic()
+            while _REQUEST_TIMES and now - _REQUEST_TIMES[0] >= 60.0:
+                _REQUEST_TIMES.popleft()
+            if len(_REQUEST_TIMES) < MAX_REQUESTS_PER_MINUTE:
+                _REQUEST_TIMES.append(time.monotonic())
+                return
+            wait = 60.0 - (now - _REQUEST_TIMES[0]) + 0.25
+        logger.info("Rate limit pacing: waiting %.1fs before next LLM request", wait)
+        time.sleep(max(wait, 0.25))
 
 
 class BaseLLMTranslation(LLMTranslation):
@@ -55,11 +84,28 @@ class BaseLLMTranslation(LLMTranslation):
         entire_raw_text = get_raw_text(blk_list)
         system_prompt = self.get_system_prompt(self.source_lang, self.target_lang)
         user_prompt = f"{extra_context}\nMake the translation sound as natural as possible.\nTranslate this:\n{entire_raw_text}"
-        
-        entire_translated_text = self._perform_translation(user_prompt, system_prompt, image)
+
+        entire_translated_text = self._perform_translation_with_retry(user_prompt, system_prompt, image)
         set_texts_from_json(blk_list, entire_translated_text)
-            
+
         return blk_list
+
+    def _perform_translation_with_retry(self, user_prompt: str, system_prompt: str, image: np.ndarray,
+                                        max_retries: int = 3) -> str:
+        """Throttled _perform_translation with backoff on retryable API failures (429/5xx)."""
+        for attempt in range(max_retries + 1):
+            _throttle()
+            try:
+                return self._perform_translation(user_prompt, system_prompt, image)
+            except Exception as e:
+                message = str(e).lower()
+                retryable = any(hint in message for hint in _RETRYABLE_STATUS_HINTS)
+                if not retryable or attempt >= max_retries:
+                    raise
+                wait = 20 * (2 ** attempt)
+                logger.warning("LLM request failed (attempt %d/%d), retrying in %ds: %s",
+                               attempt + 1, max_retries + 1, wait, str(e)[:200])
+                time.sleep(wait)
     
     @abstractmethod
     def _perform_translation(self, user_prompt: str, system_prompt: str, image: np.ndarray) -> str:
