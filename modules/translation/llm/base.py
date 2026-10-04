@@ -1,5 +1,7 @@
 from typing import Any
+import json
 import logging
+import re
 import threading
 import time
 from collections import deque
@@ -10,7 +12,7 @@ import imkit as imk
 
 from ..base import LLMTranslation
 from ...utils.textblock import TextBlock
-from ...utils.translator_utils import get_raw_text, set_texts_from_json
+from ...utils.translator_utils import get_raw_text, set_texts_from_json, has_translatable_content
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +108,81 @@ class BaseLLMTranslation(LLMTranslation):
                 logger.warning("LLM request failed (attempt %d/%d), retrying in %ds: %s",
                                attempt + 1, max_retries + 1, wait, str(e)[:200])
                 time.sleep(wait)
+
+    def translate_pages(self, blk_lists: list[list[TextBlock]], extra_context: str = "") -> tuple[set[int], set[int]]:
+        """Translate several pages in ONE LLM request.
+
+        Blocks are re-keyed globally (p<page>b<block>) so the JSON response maps
+        back unambiguously; a dropped key only leaves that single block
+        untranslated instead of shifting the rest. Pages whose keys are not all
+        present in the response are reported as failed so the caller can
+        re-translate them per page.
+
+        Returns:
+            (ok_page_indices, failed_page_indices) — translations are already
+            assigned to the blocks of ok pages. Non-translatable blocks get
+            translation="" like Translator.translate does.
+        """
+        page_keys: list[list[tuple[str, TextBlock]]] = []
+        flat_texts: dict[str, str] = {}
+        for pi, blk_list in enumerate(blk_lists):
+            keys: list[tuple[str, TextBlock]] = []
+            for bi, blk in enumerate(blk_list):
+                key = f"p{pi}b{bi}"
+                if has_translatable_content(getattr(blk, "text", "")):
+                    keys.append((key, blk))
+                    flat_texts[key] = blk.text
+                else:
+                    blk.translation = ""
+            page_keys.append(keys)
+
+        # pages with no translatable blocks are already done (blocks set to "")
+        ok_pages: set[int] = set(pi for pi, keys in enumerate(page_keys) if not keys)
+        failed_pages: set[int] = set()
+        if not flat_texts:
+            return ok_pages, failed_pages
+
+        system_prompt = self.get_system_prompt(self.source_lang, self.target_lang) + (
+            "\nYou are given MULTIPLE comic pages at once. Every key has the form p<page>b<block> "
+            "where <page> is a page number and <block> is a block index on that page. "
+            "Use the surrounding pages as context for each other. "
+            "Return ONE json object with EXACTLY the same keys as the input and the translated "
+            "text as values. DO NOT translate, add, merge or drop any keys."
+        )
+        user_prompt = (f"{extra_context}\nMake the translation sound as natural as possible.\n"
+                       f"Translate this:\n{json.dumps(flat_texts, ensure_ascii=False, indent=4)}")
+
+        old_max_tokens = self.max_tokens
+        self.max_tokens = min(16000, max(5000, 400 + 60 * len(flat_texts)))
+        try:
+            response = self._perform_translation_with_retry(user_prompt, system_prompt, None)
+        finally:
+            self.max_tokens = old_max_tokens
+
+        match = re.search(r"\{[\s\S]*\}", response)
+        if not match:
+            logger.warning("Batch translation: no JSON object in response, %d page(s) need fallback",
+                           len(blk_lists))
+            return ok_pages, set(range(len(blk_lists)))
+        try:
+            data = json.loads(match.group(0))
+        except json.JSONDecodeError as e:
+            logger.warning("Batch translation: invalid JSON (%s), %d page(s) need fallback", e, len(blk_lists))
+            return ok_pages, set(range(len(blk_lists)))
+
+        for pi, keys in enumerate(page_keys):
+            if not keys:
+                continue
+            missing = [key for key, _ in keys if key not in data]
+            if missing:
+                logger.warning("Batch translation: page %d missing %d/%d keys, needs per-page fallback",
+                               pi, len(missing), len(keys))
+                failed_pages.add(pi)
+                continue
+            for key, blk in keys:
+                blk.translation = data[key]
+            ok_pages.add(pi)
+        return ok_pages, failed_pages
     
     @abstractmethod
     def _perform_translation(self, user_prompt: str, system_prompt: str, image: np.ndarray) -> str:
