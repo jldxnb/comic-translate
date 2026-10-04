@@ -6,7 +6,9 @@ cd /d "%~dp0"
 set "PATH=%~dp0.venv\Lib\site-packages\torch\lib;%PATH%"
 
 rem ---- Batch-merge tuning: edit the two numbers, save, relaunch ----
-rem Pages per merged LLM request: higher = fewer requests (RPD/RPM divided by it)
+rem Pages per merged LLM request. 1 = strict per-page requests (original behavior),
+rem 6 = quota-saving merge (request count divided by it). Merging is skipped
+rem automatically when image input is enabled in Settings > LLMs.
 set COMIC_TRANSLATE_BATCH_PAGES=6
 rem Max text blocks per merged request: guards against overlong output
 set COMIC_TRANSLATE_BATCH_BLOCKS=100

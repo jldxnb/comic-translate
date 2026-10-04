@@ -292,11 +292,15 @@ class BatchProcessor:
         for ctxs in groups.values():
             ctxs.sort(key=lambda c: c['index'])
             translator = ctxs[0]['translator']
+            image_context_on = bool(getattr(translator.engine, 'img_as_llm_input', False))
             use_merge = (
                 translator.is_llm_engine
                 and isinstance(translator.engine, BaseLLMTranslation)
                 and len(ctxs) > 1
+                and not image_context_on
             )
+            if image_context_on and len(ctxs) > 1:
+                logger.info("Batch: 'Provide Image as Input' is enabled; using per-page requests so each page keeps its image context")
             if not use_merge:
                 for ctx in ctxs:
                     self._translate_page_fallback(ctx)
