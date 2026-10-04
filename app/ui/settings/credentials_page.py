@@ -7,9 +7,6 @@ from ..dayu_widgets.combo_box import MComboBox
 from .utils import set_label_width
 
 
-NEW_PROFILE_LABEL = "(New profile)"
-
-
 class CredentialsPage(QtWidgets.QWidget):
     """Credentials settings. The Custom service is a multi-profile editor:
     users define several OpenAI-compatible endpoints and pick one in
@@ -219,7 +216,7 @@ class CredentialsPage(QtWidgets.QWidget):
             combo = self.custom_profile_combo
             combo.blockSignals(True)
             combo.clear()
-            combo.addItem(self.tr(NEW_PROFILE_LABEL), "")
+            combo.addItem(self.tr("(New profile)"), "")
             for profile in self._profiles:
                 combo.addItem(profile["name"], profile["name"])
             index = combo.findData(select) if select else 0

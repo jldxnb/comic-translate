@@ -273,6 +273,30 @@
 <context>
     <name>CredentialsPage</name>
     <message>
+        <source>(New profile)</source>
+        <translation>（新配置）</translation>
+    </message>
+    <message>
+        <source>Model Profile:</source>
+        <translation>模型配置：</translation>
+    </message>
+    <message>
+        <source>Delete</source>
+        <translation>删除</translation>
+    </message>
+    <message>
+        <source>Name</source>
+        <translation>名称</translation>
+    </message>
+    <message>
+        <source>Add / Update Profile</source>
+        <translation>添加 / 更新配置</translation>
+    </message>
+    <message>
+        <source>Define one or more OpenAI-compatible endpoints. Each profile appears in Settings &gt; Tools &gt; Translator as &apos;Custom: &lt;name&gt;&apos;.</source>
+        <translation>定义一个或多个 OpenAI 兼容接口。每个配置会以「Custom: 名称」的形式显示在「设置 &gt; 工具 &gt; 翻译器」中。</translation>
+    </message>
+    <message>
         <location filename="../../app/ui/settings/credentials_page.py" line="18"/>
         <source>Save Keys</source>
         <translation>保存密钥</translation>
@@ -1638,6 +1662,22 @@ Open or create a project to get started.</source>
 </context>
 <context>
     <name>ToolsPage</name>
+    <message>
+        <source>Batch Translation</source>
+        <translation>批量翻译</translation>
+    </message>
+    <message>
+        <source>Pages per LLM Request:</source>
+        <translation>每次请求页数：</translation>
+    </message>
+    <message>
+        <source>Max Text Blocks per Request:</source>
+        <translation>每次请求最大文本块数：</translation>
+    </message>
+    <message>
+        <source>1 page per request keeps the original behavior. Higher values merge several pages into a single LLM request and divide API request usage (RPD/RPM) by that factor. Merging is skipped automatically when image input is enabled.</source>
+        <translation>每请求 1 页保持原始行为。数值越大，单次 LLM 请求合并的页数越多，API 请求用量（RPD/RPM）按相应倍数减少。启用图片输入时会自动跳过合并。</translation>
+    </message>
     <message>
         <location filename="../../app/ui/settings/tools_page.py" line="27"/>
         <source>Translator</source>
