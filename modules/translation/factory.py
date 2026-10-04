@@ -59,7 +59,7 @@ class TranslationFactory:
             return cls._engines[cache_key]
         
         # Determine engine class and create engine
-        engine_class = cls._get_engine_class(translator_key)
+        engine_class = cls._get_engine_class(translator_key, settings)
         engine = engine_class()
         
         # Initialize with appropriate parameters
@@ -74,7 +74,7 @@ class TranslationFactory:
     
 
     @classmethod
-    def _get_engine_class(cls, translator_key: str):
+    def _get_engine_class(cls, translator_key: str, settings=None):
         """Get the appropriate engine class based on translator key."""
 
         access_token = get_token("access_token")
@@ -88,6 +88,14 @@ class TranslationFactory:
         # Otherwise look for matching LLM engine (substring match)
         for identifier, engine_class in cls.LLM_ENGINE_IDENTIFIERS.items():
             if identifier in translator_key:
+                if identifier == "Custom" and settings is not None:
+                    # 'Gemini Native' profiles use the native Gemini engine
+                    try:
+                        creds = settings.get_credentials(translator_key) or {}
+                    except Exception:
+                        creds = {}
+                    if creds.get('api_type') == 'gemini':
+                        return GeminiTranslation
                 return engine_class
         
         # Default to LLM engine if no match found

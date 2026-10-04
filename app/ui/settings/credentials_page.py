@@ -112,8 +112,9 @@ class CredentialsPage(QtWidgets.QWidget):
     # ------------------------------------------------------------------
     def _build_custom_profiles_section(self, service_layout: QtWidgets.QVBoxLayout):
         hint = MLabel(self.tr(
-            "Define one or more OpenAI-compatible endpoints. Each profile appears in "
-            "Settings > Tools > Translator as 'Custom: <name>'."
+            "Define one or more API endpoints (OpenAI-compatible or Google Gemini "
+            "native). Each profile appears in Settings > Tools > Translator as "
+            "'Custom: <name>'."
         )).secondary()
         hint.setWordWrap(True)
         service_layout.addWidget(hint)
@@ -142,6 +143,18 @@ class CredentialsPage(QtWidgets.QWidget):
             return field
 
         self.custom_name_input = _field(self.tr("Name"))
+
+        format_row = QtWidgets.QHBoxLayout()
+        format_label = MLabel(self.tr("API Format:"))
+        self.custom_api_type_combo = MComboBox().small()
+        self.custom_api_type_combo.setFixedWidth(260)
+        self.custom_api_type_combo.addItem(self.tr("OpenAI Compatible"), "openai")
+        self.custom_api_type_combo.addItem(self.tr("Gemini Native"), "gemini")
+        format_row.addWidget(format_label)
+        format_row.addWidget(self.custom_api_type_combo)
+        format_row.addStretch()
+        service_layout.addLayout(format_row)
+
         self.custom_api_key_input = _field(self.tr("API Key"), password=True)
         self.custom_api_url_input = _field(self.tr("Endpoint URL"))
         self.custom_model_input = _field(self.tr("Model"))
@@ -205,6 +218,7 @@ class CredentialsPage(QtWidgets.QWidget):
             "api_key": self.custom_api_key_input.text().strip(),
             "api_url": self.custom_api_url_input.text().strip(),
             "model": self.custom_model_input.text().strip(),
+            "api_type": self.custom_api_type_combo.currentData() or "openai",
         }
         self._upsert_profile(entry)
         self._editing_name = name
@@ -241,6 +255,9 @@ class CredentialsPage(QtWidgets.QWidget):
         self.custom_api_key_input.setText(profile.get("api_key", "") if profile else "")
         self.custom_api_url_input.setText(profile.get("api_url", "") if profile else "")
         self.custom_model_input.setText(profile.get("model", "") if profile else "")
+        api_type = profile.get("api_type", "openai") if profile else "openai"
+        index = self.custom_api_type_combo.findData(api_type)
+        self.custom_api_type_combo.setCurrentIndex(max(0, index))
 
     def _on_profile_combo_changed(self, _index: int) -> None:
         if self._updating_profile_ui:

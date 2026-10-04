@@ -8,12 +8,14 @@ from ...utils.translator_utils import MODEL_MAP
 
 class GeminiTranslation(BaseLLMTranslation):
     """Translation engine using Google Gemini models via REST API."""
-    
+
+    DEFAULT_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
+
     def __init__(self):
         super().__init__()
         self.model_name = None
         self.api_key = None
-        self.api_base_url = "https://generativelanguage.googleapis.com/v1beta/models"
+        self.api_base_url = self.DEFAULT_API_BASE
     
     def initialize(self, settings: Any, source_lang: str, target_lang: str, model_name: str, **kwargs) -> None:
         """
@@ -23,16 +25,39 @@ class GeminiTranslation(BaseLLMTranslation):
             settings: Settings object with credentials
             source_lang: Source language name
             target_lang: Target language name
-            model_name: Gemini model name
+            model_name: Gemini model name ('Custom: <profile>' selects a
+                user-defined profile that uses the native Gemini API)
         """
         super().initialize(settings, source_lang, target_lang, **kwargs)
         
         self.model_name = model_name
-        credentials = settings.get_credentials(settings.ui.tr('Google Gemini'))
-        self.api_key = credentials.get('api_key', '')
-        
-        # Map friendly model name to API model name
-        self.model_api_name = MODEL_MAP.get(self.model_name)
+
+        if isinstance(model_name, str) and model_name.startswith("Custom"):
+            # 'Gemini Native' profile: key, raw model id and optional URL
+            # come from the profile itself.
+            credentials = settings.get_credentials(model_name) or {}
+            self.api_key = credentials.get('api_key', '')
+            self.model_api_name = (credentials.get('model') or '').strip() or None
+            self.api_base_url = self._normalize_api_base(credentials.get('api_url', ''))
+        else:
+            credentials = settings.get_credentials(settings.ui.tr('Google Gemini'))
+            self.api_key = credentials.get('api_key', '')
+            # Map friendly model name to API model name
+            self.model_api_name = MODEL_MAP.get(self.model_name)
+
+    @classmethod
+    def _normalize_api_base(cls, api_url: str) -> str:
+        """Accept compat/native/partial URLs and return a native /models base."""
+        base = (api_url or '').strip().rstrip('/')
+        if base.endswith('/openai'):
+            base = base[:-len('/openai')].rstrip('/')
+        if not base:
+            return cls.DEFAULT_API_BASE
+        if base.endswith('/models'):
+            return base
+        if base.endswith('/v1beta') or base.endswith('/v1'):
+            return base + '/models'
+        return base + '/v1beta/models'
     
     def _perform_translation(self, user_prompt: str, system_prompt: str, image: np.ndarray) -> str:
         """

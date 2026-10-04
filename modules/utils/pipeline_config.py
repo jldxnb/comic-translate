@@ -70,11 +70,12 @@ def validate_translator(main: ComicTranslate, target_lang: str):
 
     # Credential checks
     if str(translator_tool).startswith("Custom"):
-        # Custom (or 'Custom: <profile>') requires api_key, api_url, and model
+        # Custom (or 'Custom: <profile>') requires api_key, model and — unless
+        # it is a Gemini-native profile with an automatic endpoint — api_url
         # to be configured LOCALLY
         creds = settings_page.get_credentials(translator_tool) or {}
-        # Check if all required fields are present and non-empty
-        if not all([creds.get('api_key'), creds.get('api_url'), creds.get('model')]):
+        has_endpoint = bool(creds.get('api_url')) or creds.get('api_type') == 'gemini'
+        if not (creds.get('api_key') and creds.get('model') and has_endpoint):
             Messages.show_custom_not_configured_error(main)
             return False
         # Custom uses the user's own API endpoint; no account needed

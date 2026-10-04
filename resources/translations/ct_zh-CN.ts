@@ -273,6 +273,18 @@
 <context>
     <name>CredentialsPage</name>
     <message>
+        <source>API Format:</source>
+        <translation>接口格式：</translation>
+    </message>
+    <message>
+        <source>OpenAI Compatible</source>
+        <translation>OpenAI 兼容</translation>
+    </message>
+    <message>
+        <source>Gemini Native</source>
+        <translation>Gemini 原生</translation>
+    </message>
+    <message>
         <source>(New profile)</source>
         <translation>（新配置）</translation>
     </message>
@@ -293,8 +305,8 @@
         <translation>添加 / 更新配置</translation>
     </message>
     <message>
-        <source>Define one or more OpenAI-compatible endpoints. Each profile appears in Settings &gt; Tools &gt; Translator as &apos;Custom: &lt;name&gt;&apos;.</source>
-        <translation>定义一个或多个 OpenAI 兼容接口。每个配置会以「Custom: 名称」的形式显示在「设置 &gt; 工具 &gt; 翻译器」中。</translation>
+        <source>Define one or more API endpoints (OpenAI-compatible or Google Gemini native). Each profile appears in Settings &gt; Tools &gt; Translator as &apos;Custom: &lt;name&gt;&apos;.</source>
+        <translation>定义一个或多个接口（OpenAI 兼容或 Google Gemini 原生）。每个配置会以「Custom: 名称」的形式显示在「设置 &gt; 工具 &gt; 翻译器」中。</translation>
     </message>
     <message>
         <location filename="../../app/ui/settings/credentials_page.py" line="18"/>

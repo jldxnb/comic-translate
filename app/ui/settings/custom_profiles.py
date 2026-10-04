@@ -2,7 +2,8 @@
 
 A profile is a named OpenAI-compatible endpoint:
 
-    {"name": "Gemini Lite", "api_key": "...", "api_url": "...", "model": "..."}
+    {"name": "Gemini Lite", "api_key": "...", "api_url": "...", "model": "...",
+     "api_type": "openai" | "gemini"}
 
 Profiles are persisted as a JSON list under ``credentials/custom_profiles`` in
 QSettings. Translator values of the form ``Custom: <name>`` select a profile;
@@ -18,6 +19,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 PROFILES_KEY = "custom_profiles"
+API_TYPES = ("openai", "gemini")
+DEFAULT_API_TYPE = "openai"
 CREDENTIALS_GROUP = "credentials"
 CUSTOM_VALUE_PREFIX = "Custom:"
 LEGACY_FIELDS = ("api_key", "api_url", "model")
@@ -58,11 +61,15 @@ def load_profiles(qsettings) -> list[dict]:
         name = str(item.get("name", "") or "").strip()
         if not name:
             continue
+        api_type = str(item.get("api_type", DEFAULT_API_TYPE) or DEFAULT_API_TYPE).lower()
+        if api_type not in API_TYPES:
+            api_type = DEFAULT_API_TYPE
         profiles.append({
             "name": name,
             "api_key": str(item.get("api_key", "") or ""),
             "api_url": str(item.get("api_url", "") or ""),
             "model": str(item.get("model", "") or ""),
+            "api_type": api_type,
         })
     return profiles
 
@@ -92,7 +99,7 @@ def migrate_legacy_profile(qsettings, profiles: list[dict]) -> list[dict]:
     qsettings.endGroup()
     if any(legacy.values()):
         logger.info("Migrated legacy Custom credentials into a 'Default' profile")
-        return [{"name": "Default", **legacy}]
+        return [{"name": "Default", **legacy, "api_type": DEFAULT_API_TYPE}]
     return profiles
 
 

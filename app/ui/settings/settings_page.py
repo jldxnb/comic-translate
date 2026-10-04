@@ -189,6 +189,7 @@ class SettingsPage(QtWidgets.QWidget):
                     creds['api_key'] = profile.get('api_key', '')
                     creds['api_url'] = profile.get('api_url', '')
                     creds['model'] = profile.get('model', '')
+                    creds['api_type'] = profile.get('api_type', 'openai')
             return creds
 
         # no `service` passed → recurse over all known services
