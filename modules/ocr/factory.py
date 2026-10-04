@@ -1,8 +1,11 @@
 import json
 import hashlib
+import logging
 
 from modules.utils.device import resolve_device, torch_available
 from app.account.auth.token_storage import get_token
+
+logger = logging.getLogger(__name__)
 from .base import OCREngine
 from .microsoft_ocr import MicrosoftOCR
 from .google_ocr import GoogleOCR
@@ -46,6 +49,18 @@ class OCRFactory:
             Appropriate OCR engine instance
         """
         effective_backend = cls._resolve_backend(backend)
+
+        # 'Accurate' Japanese OCR mode uses the full Manga-OCR model (torch)
+        # instead of the fast mobile ONNX one.  Applies to the Default OCR
+        # engine for Japanese only.
+        if (
+            ocr_model == 'Default'
+            and source_lang_english == 'Japanese'
+            and effective_backend == 'onnx'
+            and torch_available()
+            and str(getattr(settings, 'get_japanese_ocr_mode', lambda: 'fast')()).lower() == 'accurate'
+        ):
+            effective_backend = 'torch'
 
         # build cache key
         cache_key = cls._create_cache_key(
@@ -235,12 +250,20 @@ class OCRFactory:
         device = resolve_device(settings.is_gpu_enabled(), backend)
         
         if backend.lower() == 'torch' and torch_available():
-            from .manga_ocr.engine import MangaOCREngine
-            engine = MangaOCREngine()
-            engine.initialize(device=device)
-        else:
-            engine = MangaOCRMobileONNXEngine()
-            engine.initialize(device=device)
+            try:
+                from .manga_ocr.engine import MangaOCREngine
+                engine = MangaOCREngine()
+                engine.initialize(device=device)
+                return engine
+            except Exception as exc:
+                # transformers/fugashi missing or model load failed: fall back
+                logger.warning(
+                    "Accurate Manga-OCR unavailable (%s); using the mobile engine",
+                    str(exc)[:160],
+                )
+
+        engine = MangaOCRMobileONNXEngine()
+        engine.initialize(device=resolve_device(settings.is_gpu_enabled(), 'onnx'))
         
         return engine
     

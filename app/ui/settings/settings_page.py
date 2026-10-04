@@ -220,6 +220,14 @@ class SettingsPage(QtWidgets.QWidget):
             return float(self.ui.detector_threshold_spinbox.value())
         except Exception:
             return 0.30
+
+    def get_japanese_ocr_mode(self) -> str:
+        try:
+            value = self.ui.japanese_ocr_combo.currentData()
+            return 'accurate' if value == 'accurate' else 'fast'
+        except Exception:
+            return 'fast'
+
     
     def get_user_info(self):
         """Returns the current user information."""
@@ -239,6 +247,7 @@ class SettingsPage(QtWidgets.QWidget):
                 'ocr': self.get_tool_selection('ocr'),
                 'detector': self.get_tool_selection('detector'),
                 'detector_confidence': self.get_detector_confidence(),
+                'ocr_japanese_mode': self.get_japanese_ocr_mode(),
                 'inpainter': self.get_tool_selection('inpainter'),
                 'use_gpu': self.is_gpu_enabled(),
                 'hd_strategy': self.get_hd_strategy_settings(),
@@ -411,6 +420,13 @@ class SettingsPage(QtWidgets.QWidget):
             )
         except (TypeError, ValueError):
             self.ui.detector_threshold_spinbox.setValue(0.30)
+
+        ocr_japanese_mode = str(settings.value('ocr_japanese_mode', 'fast')).lower()
+        jocr_index = self.ui.japanese_ocr_combo.findData(
+            'accurate' if ocr_japanese_mode == 'accurate' else 'fast'
+        )
+        if jocr_index >= 0:
+            self.ui.japanese_ocr_combo.setCurrentIndex(jocr_index)
 
         if is_gpu_available():
             self.ui.use_gpu_checkbox.setChecked(settings.value('use_gpu', False, type=bool))

@@ -27,7 +27,8 @@ class OCRHandler:
             device = resolve_device(
                 self.main_page.settings_page.is_gpu_enabled()
             )
-            cache_key = self.cache_manager._get_ocr_cache_key(image, source_lang, ocr_model, device)
+            jocr_mode = getattr(self.main_page.settings_page, 'get_japanese_ocr_mode', lambda: 'fast')()
+            cache_key = self.cache_manager._get_ocr_cache_key(image, source_lang, ocr_model, device, jocr_mode)
             
             if single_block:
                 blk = self.pipeline.get_selected_block()

@@ -4,7 +4,8 @@ from typing import TYPE_CHECKING, Any, Sequence
 
 from PySide6 import QtCore
 
-from modules.detection.processor import TextBlockDetector
+from modules.detection.processor import TextBlockDetector
+
 from modules.ocr.processor import OCRProcessor
 from modules.rendering.render import pyside_word_wrap, is_vertical_block, get_best_render_area
 from modules.translation.processor import Translator
@@ -262,7 +263,8 @@ class ManualWorkflowController:
                     if image is None:
                         continue
                     source_lang = state.get("source_lang", source_lang_fallback)
-                    cache_key = cache_manager._get_ocr_cache_key(image, source_lang, ocr_model, device)
+                    jocr_mode = getattr(self.main.settings_page, 'get_japanese_ocr_mode', lambda: 'fast')()
+                    cache_key = cache_manager._get_ocr_cache_key(image, source_lang, ocr_model, device, jocr_mode)
                     if cache_manager._can_serve_all_blocks_from_ocr_cache(cache_key, blk_list):
                         cache_manager._apply_cached_ocr_to_blocks(cache_key, blk_list)
                     else:

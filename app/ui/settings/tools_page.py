@@ -2,6 +2,7 @@ from PySide6 import QtWidgets
 from ..dayu_widgets.label import MLabel
 from ..dayu_widgets.check_box import MCheckBox
 from ..dayu_widgets.spin_box import MSpinBox
+from ..dayu_widgets.combo_box import MComboBox
 from .utils import create_title_and_combo, set_combo_box_width
 from modules.utils.device import is_gpu_available
 
@@ -68,6 +69,29 @@ class ToolsPage(QtWidgets.QWidget):
 
         ocr_widget, self.ocr_combo = create_title_and_combo(self.tr("Text Recognition"), self.ocr_engines, h4=True)
         set_combo_box_width(self.ocr_combo, self.ocr_engines)
+
+        # Japanese OCR quality / speed trade-off
+        jocr_row = QtWidgets.QHBoxLayout()
+        jocr_label = MLabel(self.tr("Japanese OCR:"))
+        self.japanese_ocr_combo = MComboBox().small()
+        self.japanese_ocr_combo.setFixedWidth(160)
+        self.japanese_ocr_combo.addItem(self.tr("Fast (Mobile)"), "fast")
+        self.japanese_ocr_combo.addItem(self.tr("Accurate (Base)"), "accurate")
+        jocr_row.addWidget(jocr_label)
+        jocr_row.addWidget(self.japanese_ocr_combo)
+        jocr_row.addStretch()
+
+        jocr_hint = MLabel(self.tr(
+            "Accurate uses the full Manga-OCR model: better on vertical and multi-line "
+            "text, slower, one-time ~450 MB model download."
+        )).secondary()
+        jocr_hint.setWordWrap(True)
+
+        jocr_widget = QtWidgets.QWidget()
+        jocr_widget_layout = QtWidgets.QVBoxLayout(jocr_widget)
+        jocr_widget_layout.setContentsMargins(0, 0, 0, 0)
+        jocr_widget_layout.addLayout(jocr_row)
+        jocr_widget_layout.addWidget(jocr_hint)
 
         detector_widget, self.detector_combo = create_title_and_combo(self.tr("Text Detector"), self.detectors, h4=True)
         set_combo_box_width(self.detector_combo, self.detectors)
@@ -179,6 +203,7 @@ class ToolsPage(QtWidgets.QWidget):
         layout.addWidget(detector_threshold_widget)
         layout.addSpacing(10)
         layout.addWidget(ocr_widget)
+        layout.addWidget(jocr_widget)
         layout.addSpacing(10)
         layout.addWidget(inpainting_label)
         layout.addWidget(inpainter_widget)

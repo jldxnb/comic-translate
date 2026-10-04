@@ -1675,6 +1675,22 @@ Open or create a project to get started.</source>
 <context>
     <name>ToolsPage</name>
     <message>
+        <source>Japanese OCR:</source>
+        <translation>日语 OCR：</translation>
+    </message>
+    <message>
+        <source>Fast (Mobile)</source>
+        <translation>快速（移动版）</translation>
+    </message>
+    <message>
+        <source>Accurate (Base)</source>
+        <translation>精确（原版）</translation>
+    </message>
+    <message>
+        <source>Accurate uses the full Manga-OCR model: better on vertical and multi-line text, slower, one-time ~450 MB model download.</source>
+        <translation>精确模式使用完整版 Manga-OCR 模型：竖排与多行文字识别更准，速度稍慢，首次使用需一次性下载约 450MB 模型。</translation>
+    </message>
+    <message>
         <source>Detection Threshold:</source>
         <translation>检测阈值：</translation>
     </message>
