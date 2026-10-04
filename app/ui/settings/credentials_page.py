@@ -189,7 +189,14 @@ class CredentialsPage(QtWidgets.QWidget):
         self._profiles.append(entry)
 
     def _commit_fields(self) -> None:
-        """Fold the current field values into the profile list."""
+        """Fold the current field values into the profile list.
+
+        The profile is matched by the Name field: an existing name updates that
+        profile in place, a new name adds a new one (a changed name therefore
+        never overwrites the previously edited profile). The combo box keeps
+        the item the user currently selected (e.g. '(New profile)' right after
+        clicking it).
+        """
         if self._updating_profile_ui:
             return
         name = self.custom_name_input.text().strip()
@@ -202,17 +209,9 @@ class CredentialsPage(QtWidgets.QWidget):
             "api_url": self.custom_api_url_input.text().strip(),
             "model": self.custom_model_input.text().strip(),
         }
-        if self._editing_name and self._editing_name != name:
-            for index, profile in enumerate(self._profiles):
-                if profile["name"] == self._editing_name:
-                    self._profiles[index] = entry
-                    break
-            else:
-                self._upsert_profile(entry)
-        else:
-            self._upsert_profile(entry)
+        self._upsert_profile(entry)
         self._editing_name = name
-        self._refresh_profile_combo(select=name)
+        self._refresh_profile_combo(select=self.custom_profile_combo.currentData() or "")
 
     def _refresh_profile_combo(self, select: str | None) -> None:
         self._updating_profile_ui = True
@@ -255,6 +254,9 @@ class CredentialsPage(QtWidgets.QWidget):
 
     def _on_save_profile_clicked(self) -> None:
         self._commit_fields()
+        name = self.custom_name_input.text().strip()
+        if name:
+            self._refresh_profile_combo(select=name)
 
     def _on_delete_profile_clicked(self) -> None:
         name = self.custom_profile_combo.currentData() or self._editing_name
