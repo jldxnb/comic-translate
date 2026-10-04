@@ -3,7 +3,7 @@ from PySide6.QtWidgets import QGraphicsTextItem, QGraphicsItem, \
 from PySide6.QtGui import QFont, QCursor, QColor, \
      QTextCharFormat, QTextBlockFormat, QTextCursor, QPainter
 from PySide6.QtCore import Qt, QRectF, Signal, QPointF
-import math, copy
+import math, copy, os
 from dataclasses import dataclass
 from enum import Enum
 from .text.vertical_layout import VerticalTextDocumentLayout
@@ -109,6 +109,12 @@ class TextBlockItem(QGraphicsTextItem):
         self._apply_text_direction()
 
     def set_vertical(self, vertical: bool):
+        if os.environ.get("COMIC_TRANSLATE_ENABLE_VERTICAL_RENDER") != "1":
+            # Disabled by default: the custom VerticalTextDocumentLayout
+            # renders glyphs in the theme pen colour (white on the dark
+            # theme) regardless of the item colour, and overlaps long texts.
+            # Items stay horizontal until that layout is fixed.
+            return
         doc = self.document()
         is_already_vertical = isinstance(doc.documentLayout(), VerticalTextDocumentLayout)
 

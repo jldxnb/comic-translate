@@ -1,3 +1,4 @@
+import os
 import numpy as np
 from typing import Tuple, List
 
@@ -46,9 +47,13 @@ def pil_to_array(pil_image: Image):
 def is_vertical_block(blk, lang_code: str | None) -> bool:
     """Return True if this block should be rendered vertically.
 
-    A block is considered vertical when its direction flag is "vertical"
-    and the target language code is one of the vertical-capable ones.
+    Vertical rendering is disabled by default: the custom vertical document
+    layout paints glyphs in the theme pen colour (white on the dark theme)
+    regardless of the item colour, and its column layout overlaps long texts.
+    Set COMIC_TRANSLATE_ENABLE_VERTICAL_RENDER=1 to re-enable.
     """
+    if os.environ.get("COMIC_TRANSLATE_ENABLE_VERTICAL_RENDER") != "1":
+        return False
     return getattr(blk, "direction", "") == "vertical" and is_vertical_language_code(lang_code)
 
 def _split_at_fitting_hyphen(
